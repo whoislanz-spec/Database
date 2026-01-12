@@ -1,9 +1,7 @@
-[
-  {
-    "username": "Shenzu",
-    "password": "Shenzu",
-    "role": "owner",
-    "expiresAt": 1793192020916,
-    "createdAt": 1761656020916
-  }
-]
+{
+  "tokens": [
+    "7440462557:AAGvkZvfZ5DB1ocQrzAsdXrxIziJelqUIlU",
+    "9876543210:BBBbotTokenKedua",
+    "5555555555:CCCbotTokenKetiga"
+  ]
+}
