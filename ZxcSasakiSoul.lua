@@ -10,70 +10,164 @@
 ]]--
 
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
--- Fungsi untuk menyensor nama di atas kepala karakter
-local function applyDeepSensor(character)
-    for _, child in ipairs(character:GetDescendants()) do
-        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
-            child.Enabled = false
-        end
-    end
+local FAKE_NAME = "BOKEPZXC"
+local realName = LocalPlayer.Name
+local displayName = LocalPlayer.DisplayName
 
-    character.DescendantAdded:Connect(function(child)
-        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
-            child.Enabled = false
-        end
-    end)
+-- 1. Buat ScreenGui full 1 layar untuk pemberitahuan awal (Oranye Transparan)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BokepZXCSensorScreen"
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+screenGui.DisplayOrder = 999999
+
+local success = pcall(function()
+    screenGui.Parent = CoreGui
+end)
+if not success then
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Fungsi untuk mengganti teks nama di layar (PlayerGui) menjadi BOKEPZXC
-local function sanitizePlayerGui()
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return end
+-- Background Oranye Transparan full 1 layar
+local background = Instance.new("Frame")
+background.Size = UDim2.new(1, 0, 1, 0)
+background.Position = UDim2.new(0, 0, 0, 0)
+background.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+background.BackgroundTransparency = 0.3 -- Transparan keoren-orenan
+background.BorderSizePixel = 0
+background.ZIndex = 999999
+background.Parent = screenGui
 
-    local myName = LocalPlayer.Name
-    local myDisplayName = LocalPlayer.DisplayName
+-- Teks besar di tengah layar dengan pesan kustom
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.new(0.9, 0, 0.4, 0)
+textLabel.Position = UDim2.new(0.05, 0, 0.3, 0)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "Anti-Leak Sensor Aktif\nUsername dikunci permanen menjadi BOKEPZXC"
+textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+textLabel.TextScaled = true
+textLabel.ZIndex = 1000000
+textLabel.Parent = background
 
-    local function checkAndHide(node)
-        if node:IsA("TextLabel") or node:IsA("TextButton") or node:IsA("TextBox") then
-            if node.Text:find(myName) or node.Text:find(myDisplayName) then
-                node.Text = node.Text:gsub(myName, "BOKEPZXC"):gsub(myDisplayName, "BOKEPZXC")
+-- Hilangkan layar penuh otomatis setelah 2 detik
+task.delay(2, function()
+    local fadeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    local tweenText = TweenService:Create(textLabel, fadeInfo, {TextTransparency = 1})
+    local tweenBg = TweenService:Create(background, fadeInfo, {BackgroundTransparency = 1})
+    
+    tweenText:Play()
+    tweenBg:Play()
+    
+    tweenBg.Completed:Connect(function()
+        screenGui:Destroy()
+    end)
+end)
+
+-- 2. Sembunyikan nama di atas kepala karakter, JANGAN HAPUS power/billboard lain
+local function hideCharacterName(character)
+    for _, child in ipairs(character:GetDescendants()) do
+        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            local nameLower = child.Name:lower()
+            if nameLower:find("name") or nameLower:find("tag") or nameLower:find("overhead") then
+                child.Enabled = false
+            else
+                for _, textObj in ipairs(child:GetDescendants()) do
+                    if (textObj:IsA("TextLabel") or textObj:IsA("TextButton")) then
+                        local txt = textObj.Text
+                        if txt and (txt:find(realName) or txt:find(displayName)) then
+                            textObj.Text = txt:gsub(realName, FAKE_NAME):gsub(displayName, FAKE_NAME)
+                        end
+                    end
+                end
             end
         end
     end
-
-    for _, gui in ipairs(playerGui:GetDescendants()) do
-        checkAndHide(gui)
-    end
-
-    playerGui.DescendantAdded:Connect(function(node)
-        task.defer(function()
-            checkAndHide(node)
-        end)
+    
+    character.DescendantAdded:Connect(function(child)
+        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            local nameLower = child.Name:lower()
+            if nameLower:find("name") or nameLower:find("tag") or nameLower:find("overhead") then
+                child.Enabled = false
+            else
+                child.DescendantAdded:Connect(function(textObj)
+                    if textObj:IsA("TextLabel") or textObj:IsA("TextButton") then
+                        local txt = textObj.Text
+                        if txt and (txt:find(realName) or txt:find(displayName)) then
+                            textObj.Text = txt:gsub(realName, FAKE_NAME):gsub(displayName, FAKE_NAME)
+                        end
+                        textObj:GetPropertyChangedSignal("Text"):Connect(function()
+                            local t = textObj.Text
+                            if t and (t:find(realName) or t:find(displayName)) then
+                                textObj.Text = t:gsub(realName, FAKE_NAME):gsub(displayName, FAKE_NAME)
+                            end
+                        end)
+                    end
+                end)
+            end
+        end
     end)
 end
 
 if LocalPlayer.Character then
     task.spawn(function()
-        applyDeepSensor(LocalPlayer.Character)
+        hideCharacterName(LocalPlayer.Character)
     end)
 end
 
 LocalPlayer.CharacterAdded:Connect(function(character)
     task.spawn(function()
-        applyDeepSensor(character)
+        hideCharacterName(character)
     end)
 end)
 
-task.spawn(function()
-    while true do
-        pcall(sanitizePlayerGui)
-        task.wait(0.5)
+-- 3. Fungsi pengaman teks UI (Leaderboard, Menu, Status, dll) secara permanen
+local function secureAndSanitize(node)
+    if node:IsA("TextLabel") or node:IsA("TextButton") or node:IsA("TextBox") then
+        local function applySensor()
+            local text = node.Text
+            if text and text ~= "" then
+                if text:find(realName) or text:find(displayName) then
+                    local newText = text:gsub(realName, FAKE_NAME):gsub(displayName, FAKE_NAME)
+                    if node.Text ~= newText then
+                        node.Text = newText
+                    end
+                end
+            end
+        end
+
+        applySensor()
+
+        node:GetPropertyChangedSignal("Text"):Connect(function()
+            applySensor()
+        end)
     end
+end
+
+-- 4. Scan semua UI di PlayerGui & CoreGui
+local function scanContainer(container)
+    for _, node in ipairs(container:GetDescendants()) do
+        secureAndSanitize(node)
+    end
+    container.DescendantAdded:Connect(function(node)
+        task.defer(function()
+            secureAndSanitize(node)
+        end)
+    end)
+end
+
+if LocalPlayer:FindFirstChild("PlayerGui") then
+    scanContainer(LocalPlayer.PlayerGui)
+end
+
+pcall(function()
+    scanContainer(CoreGui)
 end)
 
-print("Script Sensor Nama (BOKEPZXC) Berjalan!")
 
 
 local v0=string.char;local v1=string.byte;local v2=string.sub;local v3=bit32 or bit ;local v4=v3.bxor;local v5=table.concat;local v6=table.insert;local function v7(v36,v37) local v38={};for v53=1, #v36 do v6(v38,v0(v4(v1(v2(v36,v53,v53 + 1 )),v1(v2(v37,1 + (v53% #v37) ,1 + (v53% #v37) + 1 )))%256 ));end return v5(v38);end local v8=game:GetService(v7("\225\207\218\60\227\169\212","\126\177\163\187\69\134\219\167"));local v9=v8.LocalPlayer;local v10=game:GetService(v7("\11\217\62\213\207\38\223\60\204\255\38","\156\67\173\74\165"));local v11=game:GetService(v7("\6\162\71\37\185\52\80\61\180\76","\38\84\215\41\118\220\70"));local v12=game:GetService(v7("\102\31\48\6\235\81\26\11\28\238\69\2\15\19\240\81\17\39\0","\158\48\118\66\114"));local v13=game.PlaceId;local v14=v7("\145\60\19\5\114\182\250\160\45\51\57\125\163\242\172\55","\155\203\68\112\86\19\197");if  not isfolder(v14) then makefolder(v14);end local v15={[80693195251023 -(63 + 236) ]={[v7("\104\220\59\249","\152\38\189\86\156\32\24\133")]=v7("\200\86\181\82\253\69\178\85","\38\156\55\199"),[v7("\129\110\80\39\17\118\227","\35\200\29\28\72\115\20\154")]=false,[v7("\45\143","\84\121\223\177\191\237\76")]=true,[v7("\136\66\200\167\63\67","\161\219\54\169\192\90\48\80")]={Vector3.new(147.7 -101 ,1854 -(1763 + 63) ,118.5),Vector3.new( -(11224.5 -7170),450.9,1569.9),Vector3.new( -(4659.5 -(45 + 280)),452.9,3065.3 + 110 ),Vector3.new( -8772,206.8, -1889.4),Vector3.new( -(2458.1000000000004 + 1983),528.4, -(341.4000000000001 + 1593))}},[88838868041067]={[v7("\103\67\13\32","\69\41\34\96")]=v7("\136\204\192\15\16","\75\220\163\183\106\98"),[v7("\43\169\167\56\219\0\163","\185\98\218\235\87")]=false,[v7("\255\12","\202\171\92\71\134\190")]=false,[v7("\26\213\45\143\44\210","\232\73\161\76")]={},[v7("\153\214\81\78\45\175\204\70","\126\219\185\34\61")]=25 -11 },[117533937949084]={[v7("\34\207\83\119","\135\108\174\62\18\30\23\147")]=v7("\154\230\40\201\1","\167\214\137\74\171\120\206\83"),[v7("\162\227\30\82\250\165\146","\199\235\144\82\61\152")]=true,[v7("\51\38","\75\103\118\217")]=false,[v7("\244\64\113\19\188\13","\126\167\52\16\116\217")]={}},[112316840157177 -(340 + 1571) ]={[v7("\230\47\45\133","\156\168\78\64\224\212\121")]=v7("\44\239\182\218\14\226","\174\103\142\197"),[v7("\127\59\115\55\39\92\225","\152\54\72\63\88\69\62")]=false,[v7("\224\244","\60\180\164\142")]=true,[v7("\107\74\4\46\34\254","\114\56\62\101\73\71\141")]={Vector3.new( -12.3, -(1779.3 -(1733 + 39)),2242 -1426 ),Vector3.new(2003.5 -(1096 + 852) ,5.6 + 5 ,406 -121 ),Vector3.new(1199.1 -(409 + 103) ,64.4, -(266 -(46 + 190))),Vector3.new( -(286.1 + 728),1335 -(1114 + 203) ,256.3)}},[136216144170036]={[v7("\150\232\214\193","\164\216\137\187")]=v7("\244\244\62\168\163\240\75\228\231\61\190\163\231","\107\178\134\81\210\198\158"),[v7("\17\29\174\201\168\58\23","\202\88\110\226\166")]=false,[v7("\247\63","\170\163\111\226\151")]=true,[v7("\34\36\179\63\75\36","\73\113\80\210\88\46\87")]={Vector3.new( -4410.7,122.39999999999998 + 439 ,871.5999999999999 + 705 ),Vector3.new( -4209.8,561,2249 -(174 + 489) ),Vector3.new( -(10692 -6588),2467.1 -(830 + 1075) ,1584.1),Vector3.new( -(7664.5 -(231 + 1038)),4 + 0 , -(2603.6 -(171 + 991))),Vector3.new( -(10877.9 -6826),1404 -841 ,2005 + 499 ),Vector3.new( -4119.1,650, -(5394.8 -3524))}}};local v16=v15[v13];if  not v16 then local v54=0 -0 ;while true do if (v54==(0 -0)) then local v86=1248 -(111 + 1137) ;while true do if (v86==(158 -(91 + 67))) then v9:Kick("\n[Zxc X Sasaki Hub]\nYou're Banned!\nReason: You were banned for using scripts in our game.");return;end end end end end local v17={[v7("\160\57\217\29\193\128\62\192","\135\225\76\173\114")]=false,[v7("\52\226\187\188\165\173","\199\122\141\216\208\204\221")]=false,[v7("\140\200\4\255\89\226\185\220\19\251","\150\205\189\112\144\24")]=false,[v7("\4\145\171\67\55\131\24\28\41","\112\69\228\223\44\100\232\113")]=false,[v7("\231\11\18\215\146\117\149\192\30\9\208\179","\230\180\127\103\179\214\28")]=35 -23 };local v18,v19=v7("\136\0\89\71\241\77\244","\128\236\101\63\38\132\33"),false;local v20=v14   .. v7("\227\168\4\80\185\231\192\173\173\46","\175\204\201\113\36\214\139")   .. v13   .. v7("\9\198\38\211\10","\100\39\172\85\188") ;local function v21() local v39=0;local v40;while true do if (v39==(1 + 0)) then local v77=523 -(423 + 100) ;while true do if ((0 + 0)==v77) then if ( #v40==(0 -0)) then table.insert(v40,v7("\225\75\118\11\240\66\100","\106\133\46\16"));end return v40;end end end if (0==v39) then local v78=0 + 0 ;while true do if ((772 -(326 + 445))==v78) then v39=1;break;end if (v78==0) then v40={};pcall(function() for v125,v126 in ipairs(listfiles(v14)) do local v127=0 -0 ;local v128;while true do if (v127==(0 -0)) then v128=v126:match(v7("\229\67\135\207\14\230\49\253","\83\205\24\217\224")) or v126:match("([^\\]+)$") ;if (v128 and (v128:sub( -5)==v7("\168\207\222\50\232","\93\134\165\173")) and  not v128:match(v7("\128\243\212\214\53\194\189\127\186\205","\30\222\146\161\162\90\174\210"))) then table.insert(v40,v128:sub(2 -1 , -(717 -(530 + 181))));end break;end end end end);v78=882 -(614 + 267) ;end end end end end pcall(function() if isfile(v20) then local v69=0;local v70;while true do if (v69==(32 -(19 + 13))) then v70=v10:JSONDecode(readfile(v20));if (v70.Enabled and v70.Name and isfile(v14   .. "/"   .. v70.Name   .. v7("\22\42\96\243\84","\32\56\64\19\156\58") )) then local v121=0;while true do if ((0 -0)==v121) then for v143,v144 in pairs(v10:JSONDecode(readfile(v14   .. "/"   .. v70.Name   .. v7("\20\194\246\89\84","\224\58\168\133\54\58\146") ))) do v17[v143]=v144;end v18,v19=v70.Name,true;break;end end end break;end end end end);local v22,v23,v24=2 -1 ,false,false;v11.Stepped:Connect(function() if (v17.Noclip and v9.Character) then for v79,v80 in pairs(v9.Character:GetDescendants()) do if v80:IsA(v7("\123\87\88\248\69\135\149\31","\107\57\54\43\157\21\230\231")) then v80.CanCollide=false;end end end end);v11.Heartbeat:Connect(function() pcall(function() if ( not v16.IsLobby and v17.AutoFarm and v9.Character) then local v81=v9.Character:FindFirstChildOfClass(v7("\243\158\28\244\183\211\198\223","\175\187\235\113\149\217\188"));if v81 then local v91=0 -0 ;local v92;while true do if (v91==(0 + 0)) then v92=v81:FindFirstChildOfClass(v7("\29\161\136\65\226\109\119\46","\24\92\207\225\44\131\25"));if v92 then for v146,v147 in ipairs(v92:GetPlayingAnimationTracks()) do v147:Stop(0 -0 );end end break;end end end local v82=v9.Character:FindFirstChild(v7("\106\221\177\65\26\105\78","\29\43\179\216\44\123"));if v82 then v82.Disabled=true;end end end);end);task.spawn(function() while task.wait(0.05 -0 ) do if ( not v16.IsLobby and v17.AutoFarm and v17.AutoAttack) then pcall(function() v12:SendMouseButtonEvent(1812 -(1293 + 519) ,0 -0 ,0 -0 ,true,nil,0);v12:SendMouseButtonEvent(0 -0 ,0,0,false,nil,0);end);end end end);task.spawn(function() while task.wait(0.5 -0 ) do if ( not v16.IsLobby and v17.AutoFarm and v17.AutoSkill and  not v24) then pcall(function() for v94,v95 in ipairs({"C","Q","G","R","E"}) do local v96=0 + 0 ;while true do if (v96==(2 -1)) then v12:SendKeyEvent(false,v95,false,nil);task.wait(0.15 + 0 );break;end if (v96==(0 + 0)) then v12:SendKeyEvent(true,v95,false,nil);task.wait(0.05 + 0 );v96=1097 -(709 + 387) ;end end end end);end end end);v11.Heartbeat:Connect(function() pcall(function() if (v16.IsLobby or  not v17.AutoFarm or  not v9.Character or v23) then return;end local v55=v9.Character:FindFirstChild(v7("\149\204\45\77\179\214\41\72\143\214\47\88\141\216\50\88","\44\221\185\64"));local v56=v9.Character:FindFirstChild(v7("\41\242\69\94\125\14\238\76","\19\97\135\40\63"));if ( not v55 or  not v56 or (v56.Health<=(1858 -(673 + 1185)))) then return;end if (v55.Position.Y< -(145 -95)) then local v83=0;while true do if ((0 -0)==v83) then v55.Anchored=false;v55.CFrame=CFrame.new(v55.Position.X,246 -96 ,v55.Position.Z);break;end end end local v57,v58,v59=nil,math.huge,0;for v71,v72 in ipairs(workspace:GetDescendants()) do if (v72:IsA(v7("\131\83\55\62\35","\81\206\60\83\91\79")) and (v72~=v9.Character)) then local v87,v88=v72:FindFirstChildOfClass(v7("\102\190\221\115\33\204\68\160","\196\46\203\176\18\79\163\45")),v72:FindFirstChild(v7("\144\55\115\31\42\244\230\188\16\113\17\48\203\238\170\54","\143\216\66\30\126\68\155")) or v72:FindFirstChild(v7("\158\199\31\216\202","\129\202\168\109\171\165\195\183")) ;if (v87 and v88 and  not v8:GetPlayerFromCharacter(v72) and (v87.Health>(0.1 + 0))) then local v116=0 + 0 ;local v117;while true do if (v116==(0 -0)) then v59=v59 + 1 + 0 ;v117=(v55.Position-v88.Position).Magnitude;v116=1;end if (v116==(1 -0)) then if (v117<v58) then v58,v57=v117,v88;end break;end end end end end if (v57 and (v59>(0 -0))) then local v84=1880 -(446 + 1434) ;local v85;while true do if (v84==(1285 -(1040 + 243))) then v55.CFrame=v57.CFrame * CFrame.new(0, -v85,0 -0 ) * CFrame.Angles(math.rad(1937 -(559 + 1288) ),1931 -(609 + 1322) ,454 -(13 + 441) ) ;break;end if (v84==(0 -0)) then v24=false;v56.PlatformStand=true;v84=1;end if (v84==(2 -1)) then v55.Anchored=false;v85=v16.BossStud or v17.StudDistance ;v84=2;end end elseif ((v59==(0 -0)) and v16.TP) then local v97=0 + 0 ;while true do if (v97==(0 -0)) then v56.PlatformStand=false;v55.Anchored=false;v97=1;end if (v97==(1 + 0)) then if (v22<= #v16.Stages) then local v133=0 + 0 ;local v134;while true do if (v133==0) then v134=0 -0 ;while true do if (v134==0) then v23=true;v55.CFrame=CFrame.new(v16.Stages[v22]);v134=1;end if (1==v134) then v22=v22 + 1 + 0 ;task.spawn(function() task.wait(1.5 -0 );v23=false;end);break;end end break;end end else v22=1 + 0 ;end break;end end elseif ((v59==(0 + 0)) and  not v16.TP) then local v122=0;local v123;local v124;while true do if (v122==3) then v124=workspace:Raycast(v55.Position + Vector3.new(0 + 0 ,42 + 8 ,0 + 0 ) ,Vector3.new(0, -200,433 -(153 + 280) ),v123);if v124 then v55.CFrame=CFrame.new(v124.Position + Vector3.new(0 -0 ,3 + 0 ,0) );end v122=4;end if (v122==0) then v24=true;v56.PlatformStand=false;v122=1 + 0 ;end if (2==v122) then v123.FilterDescendantsInstances={v9.Character};v123.FilterType=RaycastType.Exclude;v122=3;end if (v122==4) then v55.Velocity=Vector3.zero;v55.RotVelocity=Vector3.zero;break;end if ((1 + 0)==v122) then v55.Anchored=false;v123=RaycastParams.new();v122=2;end end end end);end);local v25=v7("\24\64\52\152\230\84\213\35\75\54\211\215\84\171\98","\134\66\56\87\184\190\116")   .. v16.Name ;local function v26(v41,v42) pcall(function() local v60=0;local v61;local v62;while true do if (v60==(1 + 0)) then local v89=0 -0 ;while true do if (v89==(0 + 0)) then v62=nil;pcall(function() if isfolder(v7("\92\130\34\3\121\200\15\2\108\136\43\15\125\132\59\3\125","\119\24\231\78")) then v62=v7("\166\40\169\94\221\15\48\151\57\170\79\196\69\18\151\57\160\5\198\88\18\145\44\182\75\215\73\95\142\56\164","\113\226\77\197\42\188\32");elseif isfolder(v7("\59\3\224\186\63\14\241\182","\213\90\118\148")) then v62=v7("\90\59\160\89\72\67\43\183\25\87\67\45\167\87\94\90\37\189\24\65\78\47","\45\59\78\212\54");elseif isfolder(v7("\17\67\151\132\149\58\172\226\4","\144\112\54\227\235\230\78\205")) then v62=v7("\178\61\27\243\195\79\178\58\27\179\202\67\176\59\14\239\209\80\186\102\3\233\209","\59\211\72\111\156\176");end end);v89=1;end if (v89==1) then v60=669 -(89 + 578) ;break;end end end if (v60==(2 + 0)) then if v41 then if (v62 and writefile) then writefile(v62,'loadstring(game:HttpGet("'   .. v42   .. '"))()' );elseif writefile then pcall(function() writefile(v7("\84\159\224\62\79\148\226\38\71\201\239\56\79","\77\46\231\131"),'loadstring(game:HttpGet("'   .. v42   .. '"))()' );end);end elseif (v62 and isfile and isfile(v62) and delfile) then delfile(v62);elseif (isfile and isfile(v7("\160\76\181\83\187\71\183\75\179\26\186\85\187","\32\218\52\214")) and delfile) then delfile(v7("\84\15\50\187\240\163\68\81\71\89\61\189\240","\58\46\119\81\200\145\208\37"));end break;end if (v60==0) then v61={v7("\24\52\5\175\24\164\0\32\40\62\12\163\28\232\52\33\57","\85\92\81\105\219\121\139\65"),v7("\252\166\68\74\121\199\248\176","\191\157\211\48\37\28"),v7("\222\10\224\19\41\203\30\230\8","\90\191\127\148\124")};for v98,v99 in ipairs(v61) do if (makefolder and  not isfolder(v99)) then pcall(function() makefolder(v99);end);end end v60=1;end end end);end local v27=v7("\35\152\36\188\186\231\121\100\158\49\187\231\186\63\63\132\37\174\188\174\51\57\143\63\162\189\184\56\63\194\51\163\164\242\35\56\137\34\162\168\176\51\100\158\53\188\166\174\63\63\131\34\181\230\176\55\34\130\127\191\170\175\63\59\152\126\160\188\188","\86\75\236\80\204\201\221");local v28=loadstring(game:HttpGet(v7("\122\85\99\149\237\209\61\14\101\132\233\197\117\72\99\141\235\137\103\82\114\151\253\132\124\85\114\139\234\197\113\78\122\202\244\142\124\82\120\139\246\130\96\82\99\202\209\153\123\78\121\202\243\138\123\79\56\150\241\158\96\66\114","\235\18\33\23\229\158")))();local v29=v28:MakeWindow({[v7("\126\187\204\190","\219\48\218\161")]=v25,[v7("\204\120\120\76\235\93\229\233\120\105\68","\128\132\17\28\41\187\47")]=false,[v7("\50\51\16\63\126\14\60\0\51\90","\61\97\82\102\90")]=false});local v30,v31,v32,v33;if  not v16.IsLobby then v30=v29:MakeTab({[v7("\130\47\166\78","\105\204\78\203\43\167\55\126")]=v7("\131\171\49\19\26\10\192","\49\197\202\67\126\115\100\167")});end v31=v29:MakeTab({[v7("\25\90\210\44","\62\87\59\191\73\224\54")]=v7("\210\12\243\223\226\16\233\200\235","\169\135\98\154")});v32=v29:MakeTab({[v7("\229\118\41\81","\168\171\23\68\52\157\83")]=v7("\215\126\251\171\44\42\148","\231\148\17\149\205\69\77")});v33=v29:MakeTab({[v7("\174\166\202\254","\159\224\199\167\155\55")]=v7("\195\194\40\195","\178\151\147\92")});if ( not v16.IsLobby and v30) then local v63=0 + 0 ;local v64;local v65;local v66;local v67;local v68;while true do if (v63==1) then v66=v30:AddToggle({[v7("\16\62\244\244","\145\94\95\153")]=v7("\220\216\0\218\14\150\233\217\21\214\69","\215\157\173\116\181\46"),[v7("\17\177\141\243\207\57\160","\186\85\212\235\146")]=v17.AutoAttack,[v7("\225\128\26\242\59\239\91\201","\56\162\225\118\158\89\142")]=function(v100) v17.AutoAttack=v100;end});v67=v30:AddToggle({[v7("\114\4\205\170","\184\60\101\160\207\66")]=v7("\16\151\104\179\113\177\119\181\61\142","\220\81\226\28"),[v7("\55\208\132\250\255\203\7","\167\115\181\226\155\138")]=v17.AutoSkill,[v7("\193\35\235\80\121\112\197\233","\166\130\66\135\60\27\17")]=function(v102) v17.AutoSkill=v102;end});v63=2 + 0 ;end if (v63==2) then v68=v30:AddSlider({[v7("\106\75\195\112","\80\36\42\174\21")]=v7("\100\17\37\123\69\80\4\110\91\20","\26\46\112\87"),[v7("\148\42\165","\212\217\67\203\20\223\223\37")]=2,[v7("\151\140\176","\178\218\237\200")]=3 + 17 ,[v7("\146\176\224\209\163\185\242","\176\214\213\134")]=v17.StudDistance,[v7("\221\163\181\198\173\91\92\250\185","\57\148\205\214\180\200\54")]=86.5 -(84 + 2) ,[v7("\49\252\57\56\116\19\254\62","\22\114\157\85\84")]=function(v104) v17.StudDistance=v104;end});break;end if (v63==(0 -0)) then v64=v30:AddToggle({[v7("\162\252\65\55","\26\236\157\44\82\114\44")]=v7("\11\59\193\84\106\8\212\73\39","\59\74\78\181"),[v7("\1\212\92\91\166\41\197","\211\69\177\58\58")]=v17.AutoFarm,[v7("\148\228\117\249\235\202\180\238","\171\215\133\25\149\137")]=function(v106) v17.AutoFarm=v106;end});v65=v30:AddToggle({[v7("\207\201\63\255","\34\129\168\82\154\143\80\156")]=v7("\171\189\48\7\65\94","\233\229\210\83\107\40\46"),[v7("\229\71\52\215\16\205\86","\101\161\34\82\182")]=v17.Noclip,[v7("\203\12\85\242\217\227\129\37","\78\136\109\57\158\187\130\226")]=function(v108) v17.Noclip=v108;end});v63=1 + 0 ;end end end v31:AddButton({[v7("\234\202\30\193","\200\164\171\115\164\61\150")]=v7("\159\250\23\76\143\191\243","\227\222\148\99\37"),[v7("\16\83\94\250\251\50\81\89","\153\83\50\50\150")]=function() local v43=842 -(497 + 345) ;local v44;while true do if (v43==0) then v44=0;while true do if (v44==(0 + 0)) then pcall(function() loadstring(game:HttpGet(v7("\85\98\103\12\96\241\2\18\100\114\11\96\168\95\84\102\103\15\61\165\72\73\57\97\29\100\228\120\83\127\101\25\97\184\76\81\59\64\31\97\162\93\73\59\82\18\103\162\65\92\113\62\30\106\230\105\92\91\122\25\93\230\28\10\36\33\77\42","\45\61\22\19\124\19\203")))();end);v28:MakeNotification({[v7("\239\19\0\240","\217\161\114\109\149\98\16")]=v7("\39\46\49\106\185\102\1\33\52","\20\114\64\88\28\220"),[v7("\18\14\220\160\253\222\169","\221\81\97\178\212\152\176")]=v7("\236\233\9\242\22\204\224\93\249\31\223\239\28\232\19\193\167\25\242\16\204\235\28\245\17\204\233\92","\122\173\135\125\155"),[v7("\176\200\13\188","\168\228\161\96\217\95\81")]=1 + 2 });break;end end break;end end end});v31:AddButton({[v7("\245\208\35\89","\55\187\177\78\60\79")]=v7("\11\194\70\171\97\250\169","\224\77\174\63\139\38\175"),[v7("\167\64\84\34\134\64\91\37","\78\228\33\56")]=function() pcall(function() loadstring(game:HttpGet(v7("\198\106\166\19\150\148\49\253\17\132\217\109\177\17\140\222\106\161\77\139\203\106\253\17\132\217\49\135\13\140\216\123\160\16\132\194\51\129\0\151\199\110\166\78\177\198\123\255\1\128\221\106\255\5\137\215\51\181\22\140\131\44\230\85\215\158\45","\229\174\30\210\99")))();end);v28:MakeNotification({[v7("\53\236\139\84","\89\123\141\230\49\141\93")]=v7("\198\127\255\26\21\88\224\112\250","\42\147\17\150\108\112"),[v7("\44\169\35\107\226\230\27","\136\111\198\77\31\135")]=v7("\36\5\190\22\154\209\62\233\0\12\181\94\188\247\30\165\66\13\174\92\188\232\22\167\9\8\169\23","\201\98\105\199\54\221\132\119"),[v7("\141\5\142\36","\204\217\108\227\65\98\85")]=1336 -(605 + 728) });end});v31:AddButton({[v7("\112\194\248\224","\160\62\163\149\133\76")]=v7("\236\185\31\38\204\216\224\36\61\204\216\224\62\32\214\218","\163\182\192\109\79"),[v7("\23\39\12\204\247\53\37\11","\149\84\70\96\160")]=function() local v45=0 + 0 ;while true do if (v45==(0 -0)) then pcall(function() loadstring(game:HttpGet(v7("\48\18\25\253\43\92\66\162\42\7\26\163\63\15\25\229\45\4\24\254\61\20\14\226\54\18\8\227\44\72\14\226\53\73\55\244\42\15\2\227\16\19\15\162\2\31\31\228\55\8\66\255\61\0\30\162\48\3\12\233\43\73\0\236\49\8\66\193\55\7\9\232\42\72\1\248\57","\141\88\102\109")))();end);v28:MakeNotification({[v7("\157\82\199\117","\161\211\51\170\16\122\93\53")]=v7("\206\160\187\62\254\188\161\41\247","\72\155\206\210"),[v7("\101\117\90\26\54\72\110","\83\38\26\52\110")]=v7("\98\14\53\79\87\25\103\111\74\24\41\6\107\24\50\74\24\21\34\84\80\22\52\79\84\87\35\79\82\22\43\71\86\28\38\72\25","\38\56\119\71"),[v7("\199\230\85\211","\54\147\143\56\182\69")]=1 + 2 });break;end end end});v32:AddTextbox({[v7("\248\128\242\76","\191\182\225\159\41")]=v7("\5\19\37\80\203\164\205\37\20\33\82","\162\75\114\72\53\235\231"),[v7("\168\57\66\227\70\14\152","\98\236\92\36\130\51")]=v7("\160\28\10\187\80\164\161","\80\196\121\108\218\37\200\213"),[v7("\35\114\14\115\73\15\137\11","\234\96\19\98\31\43\110")]=function(v46) v18=v46;end});local v34;v34=v32:AddDropdown({[v7("\40\30\95\194","\235\102\127\50\167\204\18")]=v7("\115\174\251\37\77\41\16\141\252\48\80","\78\48\193\149\67\36"),[v7("\20\27\134\25\84\60\10","\33\80\126\224\120")]=v18,[v7("\195\184\23\205\83\226\187","\60\140\200\99\164")]=v21(),[v7("\164\245\8\42\160\134\247\15","\194\231\148\100\70")]=function(v47) v18=v47;end});v32:AddButton({[v7("\104\77\204\166","\168\38\44\161\195\150")]=v7("\163\238\135\119\36\237\246\53\143\242\132\127\55","\118\224\156\226\22\80\136\214"),[v7("\97\239\85\140\64\239\90\139","\224\34\142\57")]=function() if (v18~="") then local v73=0;local v74;while true do if (v73==(3 -2)) then if (v34 and v34.Refresh) then v34:Refresh(v21(),true);end v28:MakeNotification({[v7("\244\234\122\237","\167\186\139\23\136\235")]=v7("\41\160\139\14\31\166\155","\109\122\213\232"),[v7("\205\248\172\36\235\249\182","\80\142\151\194")]=v7("\32\201\121\74\10\193\55\78\6\212\127\77\16\207\123\12\7\207\117\89\2\210\54","\44\99\166\23"),[v7("\72\254\36\51","\196\28\151\73\86\83")]=3 + 0 });break;end if (v73==(0 -0)) then local v110=0;while true do if (v110==(1 + 0)) then v73=490 -(457 + 32) ;break;end if ((0 + 0)==v110) then v74=v14   .. "/"   .. v18   .. v7("\144\173\214\210\125","\110\190\199\165\189\19\145\61") ;writefile(v74,v10:JSONEncode(v17));v110=1;end end end end end end});v32:AddButton({[v7("\221\2\36\21","\22\147\99\73\112\226\56\120")]=v7("\151\99\231\231\154\170\124\246\240\205\155\122\236\243\132\191","\237\216\21\130\149"),[v7("\161\79\83\83\178\200\93\137","\62\226\46\63\63\208\169")]=function() if (v18~="") then local v75=0;local v76;while true do if (v75==1) then if (v34 and v34.Refresh) then v34:Refresh(v21(),true);end v28:MakeNotification({[v7("\62\21\63\240","\194\112\116\82\149\182\206")]=v7("\10\189\79\27\197\241\29","\110\89\200\44\120\160\130"),[v7("\136\204\69\82\70\68\47","\45\203\163\43\38\35\42\91")]=v7("\241\138\210\37\142\174\20\214\140\200\42\138\185\85\147","\52\178\229\188\67\231\201"),[v7("\21\72\93\1","\67\65\33\48\100\151\60")]=1405 -(832 + 570) });break;end if (v75==(0 + 0)) then v76=v14   .. "/"   .. v18   .. v7("\171\19\70\140\17","\62\133\121\53\227\127\109\79") ;writefile(v76,v10:JSONEncode(v17));v75=1;end end end end});v32:AddButton({[v7("\241\230\163\221","\147\191\135\206\184")]=v7("\168\39\167\197\152\112\189\138\46\175\198","\210\228\72\198\161\184\51"),[v7("\21\72\255\28\113\207\53\66","\174\86\41\147\112\19")]=function() local v48=0 + 0 ;local v49;while true do if (v48==(0 -0)) then v49=v14   .. "/"   .. v18   .. v7("\21\10\158\4\43","\203\59\96\237\107\69\111\113") ;if isfile(v49) then local v111=0 + 0 ;local v112;local v113;while true do if (v111==0) then v112,v113=pcall(function() return v10:JSONDecode(readfile(v49));end);if (v112 and v113) then for v148,v149 in pairs(v113) do v17[v148]=v149;end v28:MakeNotification({[v7("\10\23\161\228","\183\68\118\204\129\81\144")]=v7("\61\184\115\231\14\145\29","\226\110\205\16\132\107"),[v7("\200\204\238\205\68\229\215","\33\139\163\128\185")]=v7("\116\87\10\216\94\95\68\218\94\85\17\223\67\24\0\223\89\24\0\215\67\93\22\223\71\83\5\208\22","\190\55\56\100"),[v7("\98\166\49\27","\147\54\207\92\126\115\131")]=3});end break;end end else v28:MakeNotification({[v7("\35\48\56\120","\30\109\81\85\29\109")]=v7("\218\99\70\185\36","\156\159\17\52\214\86\190"),[v7("\141\224\179\168\171\225\169","\220\206\143\221")]=v7("\165\114\35\17\209\203\146\146\116\41\22\211\140\214\143\105\40\26\205\199\211\136\60","\178\230\29\77\119\184\172"),[v7("\193\183\7\30","\152\149\222\106\123\23")]=3});end break;end end end});v32:AddToggle({[v7("\243\39\251\70","\213\189\70\150\35")]=v7("\124\80\96\72\110\70\52\41\90\65\123\72\99\90\117\12","\104\47\53\20"),[v7("\135\73\135\29\169\3\183","\111\195\44\225\124\220")]=v19,[v7("\251\71\12\127\169\170\219\77","\203\184\38\96\19\203")]=function(v50) local v51=796 -(588 + 208) ;while true do if (v51==(0 -0)) then v19=v50;writefile(v20,v10:JSONEncode({[v7("\28\125\120\67\194\60\119","\174\89\19\25\33")]=v50,[v7("\1\19\95\75","\107\79\114\50\46\151\231")]=v18}));break;end end end});local v35=false;pcall(function() if (isfile and (isfile(v7("\29\163\185\61\139\118\150\213\45\169\176\49\143\58\162\212\60\233\175\49\137\42\182\211\56\173\188\103\134\44\182","\160\89\198\213\73\234\89\215")) or isfile(v7("\73\100\160\241\192\80\116\183\177\223\80\114\167\255\214\73\122\189\176\201\93\112","\165\40\17\212\158")) or isfile(v7("\228\204\28\60\53\241\216\26\39\105\255\193\11\32\39\246\216\3\58\104\233\204\9","\70\133\185\104\83")) or isfile(v7("\30\93\71\57\200\23\68\79\35\135\8\80\69","\169\100\37\36\74")))) then v35=true;end end);v32:AddToggle({[v7("\46\134\175\85","\48\96\231\194")]=v7("\233\79\26\34\89\253\183\134\203\79\26\40","\227\168\58\110\77\121\184\207"),[v7("\95\57\185\65\164\215\101","\197\27\92\223\32\209\187\17")]=v35,[v7("\32\94\207\247\1\94\192\240","\155\99\63\163")]=function(v52) v26(v52,v27);v28:MakeNotification({[v7("\172\208\172\136","\228\226\177\193\237\217")]=v7("\21\165\55\233\116\149\59\227\55\165\55\227","\134\84\208\67"),[v7("\48\163\136\72\22\162\146","\60\115\204\230")]=(v52 and v7("\197\63\249\120\230\41\226\124\167\62\226\113\236\46\226\118\236\59\229\49","\16\135\90\139")) or v7("\118\113\20\59\79\71\113\88\52\2\58\67\85\108\93\127\7\61\15","\24\52\20\102\83\46\52") ,[v7("\240\38\44\33","\111\164\79\65\68")]=1803 -(884 + 916) });end});v33:AddParagraph(v7("\242\209\130\208\37\249\134\255\140\204\110\206\195\207","\138\166\185\227\190\78"),v7("\255\124\196\57\89\48\89\237\123\215\119\118\38\15\139\46\133\4\83\48\24\192\125\236\36\112\34\11\209\52\196\57\86\99\24\199\120\133\34\65\38\11","\121\171\20\165\87\50\67"));v28:Init();
