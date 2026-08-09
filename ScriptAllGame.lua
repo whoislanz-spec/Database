@@ -1,23 +1,39 @@
--- Script Prank Realistik Error Code 600
--- Letakkan di LocalScript (StarterPlayerScripts atau StarterGui)
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
 
-local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer
+local Window = OrionLib:MakeWindow({
+    Name = "Zxc X Sasaki Hub [Private]", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "ZxcSasakiConfig",
+    IntroText = "Loading Zxc X Sasaki..."
+})
 
--- Format teks agar menyerupai tampilan banned sistem keamanan Roblox
-local pesanBanPalsu = 
-    "\nYour account has been moderated due to unexpected client behavior." ..
-    "\n\nReason: Exploiting / Unauthorized Third-Party Software" ..
-    "\nModerator Note: Detected modified code or exploit injection." ..
-    "\n\nError Code: 600" ..
-    "\nIncident ID: #" .. math.random(100000000, 999999999) .. 
-    "\n\nPlease rejoin or visit the Roblox website for more information."
+local MainTab = Window:MakeTab({
+    Name = "Main Exploit",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
 
--- Jeda beberapa detik sebelum pemain di-kick agar mereka sempat kaget
-task.wait(3)
+local TrollTab = Window:MakeTab({
+    Name = "Troll Features",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
 
--- Melakukan kick (pemain hanya keluar dari map/server, tidak benar-benar kena banned permanen)
-localPlayer:Kick(pesanBanPalsu)
+MainTab:AddToggle({
+    Name = "Auto Win / Infinite Yield",
+    Default = false,
+    Callback = function(Value)
+        print("Auto Win: " .. tostring(Value))
+    end
+})
+
+MainTab:AddSlider({
+    Name = "Speed Hack",
+    Min = 16,
+    Max = 300,
+    Default = 16,
+    Color = Color3.fromRGB(0, 255, 255),
     Increment = 5,
     ValueName = "Speed",
     Callback = function(Value)
@@ -34,6 +50,27 @@ TrollTab:AddButton({
             Image = "rbxassetid://4483345998",
             Time = 2
         })
+    end
+})
+
+OrionLib:Init()
+
+task.wait(4)
+
+OrionLib:Destroy()
+
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local pesanBanPalsu = 
+    "\nYour account has been moderated due to unexpected client behavior." ..
+    "\n\nReason: Exploiting / Unauthorized Third-Party Software" ..
+    "\nModerator Note: Detected modified code or exploit injection." ..
+    "\n\nError Code: 600" ..
+    "\nIncident ID: #" .. math.random(100000000, 999999999) .. 
+    "\n\nPlease rejoin or visit the Roblox website for more information."
+
+localPlayer:Kick(pesanBanPalsu)
     end
 })
 
