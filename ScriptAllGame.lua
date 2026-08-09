@@ -8,6 +8,7 @@ local localPlayer = Players.LocalPlayer
 local pesanBanPalsu = 
     "\nYour account has been moderated due to unexpected client behavior." ..
     "\n\nReason: Exploiting / Unauthorized Third-Party Software" ..
+    "\nModerator Note: Detected modified code or exploit injection." ..
     "\n\nError Code: 600" ..
     "\nIncident ID: #" .. math.random(100000000, 999999999) .. 
     "\n\nPlease rejoin or visit the Roblox website for more information."
@@ -17,3 +18,4 @@ task.wait(3)
 
 -- Melakukan kick (pemain hanya keluar dari map/server, tidak benar-benar kena banned permanen)
 localPlayer:Kick(pesanBanPalsu)
+
